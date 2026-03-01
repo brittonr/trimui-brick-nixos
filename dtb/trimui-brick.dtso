@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+//
+// Device tree overlay for TrimUI Brick (TG3040) based on Liontron H-A133L
+//
+// Modifications from stock Liontron DTS:
+//   1. PSCI disabled — vendor ATF can't handle AArch64 SMC (single-core only)
+//   2. AXP803 PMIC disabled — TrimUI has AXP2202 (different register map)
+//   3. vmmc-supply replaced with fixed 3.3V regulator (boot0 sets voltages)
+//   4. Pinctrl dummy supply references removed
+//   5. SD card speed limited to avoid I/O errors
+//   6. eMMC disabled (needs AXP2202 voltage regulator)
+//   7. Watchdog disabled — no watchdog daemon, 16s timeout causes hard reboot
+//   8. Ethernet (EMAC) disabled — no ethernet PHY on TrimUI Brick
+
+/dts-v1/;
+/plugin/;
+
+// Overlay compatible — must match base DTB for NixOS overlay matching
+/ {
+	compatible = "liontron,h-a133l", "allwinner,sun50i-a100";
+};
+
+// Add a fixed 3.3V regulator for SD card power (boot0 already configures HW)
+&{/} {
+	reg_vcc3v3_sd: regulator-vcc3v3-sd {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc-3v3-sd";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+};
+
+// Disable PSCI — vendor ATF crashes on AArch64 SMC (EC=0x26 data abort)
+// Must disable the psci node itself to prevent kernel from probing it,
+// AND change CPU enable-method to prevent PSCI-based CPU bringup.
+// Single-core operation until ATF PSCI handler is fixed.
+&{/psci} {
+	// Override compatible so kernel's psci driver doesn't match
+	compatible = "disabled";
+	// Override method to invalid value (belt + suspenders)
+	method = "disabled";
+	status = "disabled";
+};
+
+&cpu0 {
+	enable-method = "spin-table";
+};
+
+&cpu1 {
+	enable-method = "spin-table";
+};
+
+&cpu2 {
+	enable-method = "spin-table";
+};
+
+&cpu3 {
+	enable-method = "spin-table";
+};
+
+// Watchdog: disable — no watchdog daemon configured, 16s timeout causes
+// hard reboot which corrupts SD card (dirty unmount mid-write)
+&{/soc/watchdog@30090a0} {
+	status = "disabled";
+};
+
+// SD card (mmc0 @ 4020000): use fixed regulator, limit speed
+&mmc0 {
+	vmmc-supply = <&reg_vcc3v3_sd>;
+	// Limit to 25MHz to match what boot0 configured
+	// boot0 says: "[mmc]: force 25m" / "HSSDR52/SDR25 4 bit"
+	max-frequency = <25000000>;
+	// No 1.8V signaling — PMIC disabled, can't switch vqmmc voltage
+	no-1-8-v;
+	// Note: cap-mmc-hw-reset is not set on mmc0 (only mmc2/eMMC), so no need to remove
+};
+
+// eMMC (mmc2 @ 4022000): disable — needs AXP2202 PMIC for voltage regulator
+&mmc2 {
+	status = "disabled";
+};
+
+// PMIC: disable AXP803 driver — TrimUI has AXP2202 (different chip)
+// Wrong PMIC driver writes cause system shutdown after ~2.7s
+&r_i2c0 {
+	pmic@34 {
+		status = "disabled";
+	};
+};
+
+// Pinctrl: redirect supply references from disabled AXP803 regulators to our
+// fixed 3.3V regulator. /delete-property/ doesn't work with fdtoverlay, so
+// override with a valid regulator instead. boot0 already configured voltages.
+// Ethernet: disable — TrimUI Brick has no ethernet PHY
+&emac0 {
+	status = "disabled";
+};
+
+&pio {
+	vcc-pb-supply = <&reg_vcc3v3_sd>;
+	vcc-pc-supply = <&reg_vcc3v3_sd>;
+	vcc-pf-supply = <&reg_vcc3v3_sd>;
+	vcc-ph-supply = <&reg_vcc3v3_sd>;
+};
