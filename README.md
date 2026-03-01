@@ -1,5 +1,11 @@
 # NixOS on TrimUI Brick (TG3040)
 
+> Built at [Aurora Sprint](https://aurorasprint.com) — the boot chain was
+> reverse engineered and developed by Claude (via [pi](https://github.com/mariozechner/pi))
+> with physical access to the hardware through an automated DUT test harness.
+> 21 iterations of boot\_package scripts were flashed, power-cycled, and analyzed
+> without human hands touching the hardware. See `harness/` and `FINDINGS.md`.
+
 NixOS SD card image for the TrimUI Brick handheld gaming device.
 
 ## Device
@@ -342,30 +348,6 @@ voltages, so this is safe for basic operation.
 
 Thanks to [Matthew Croughan](https://github.com/MatthewCroughan) for
 [nixos-a133](https://github.com/MatthewCroughan/nixos-a133) and in-person guidance.
-
-## How This Was Made
-
-This project was built as part of [Aurora Sprint](https://aurorasprint.com) — an
-experiment in AI-driven hardware hacking.
-
-The entire boot chain — reverse engineering the vendor firmware, writing the
-AArch32→AArch64 RMR shim, binary-patching the ATF, assembling the boot\_package,
-building the Nix derivations, and debugging 21 iterations of boot\_package scripts —
-was done by Claude through pi with physical access to the hardware via a
-device-under-test (DUT) test harness:
-
-- **[SDWire](https://wiki.tizen.org/SDWire)** SD card multiplexer for
-  automated flash cycles (switch SD between host and DUT without unplugging)
-- **[Seeed XIAO RP2350](https://www.seeedstudio.com/XIAO-RP2350-p-5944.html)**
-  running custom Embassy firmware (`harness/trimui_harness.rs`) — dual USB CDC:
-  one port bridges the A133 UART, the other controls reset via GPIO
-- **pi's `trimui_harness` extension** (`harness/trimui-harness.ts`)
-  orchestrating the build → flash → reset → capture → analyze loop
-
-Each boot\_package version (v2 through v21) was flashed to the SD card, the
-TrimUI was power-cycled, and serial output was captured and analyzed — all
-without human hands touching the hardware. The `FINDINGS.md` log and
-`serial_logs/` directory preserve the full debug history.
 
 ## Related Repositories
 
